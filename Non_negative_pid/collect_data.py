@@ -21,74 +21,8 @@ from pid_core import pid,pid_stability
 # ------------------
 
 
-def sendToArduino(message):
-    global connection
-    connection.write(bytes(message, 'utf-8'))
-    connection.flushInput()
-    newMessage = readFromArduino(connection)
-
-    return newMessage
-
-# --------------------------------
-# Read any output from the Arduino
-def readFromArduino(board, timeout=-1):
-
-    # Start a timer
-    start_time = time.time()
-    read_arduino = True
-
-    # Start the waiting loop
-    while board.inWaiting() == 0 and read_arduino:
-
-        # Check for timeout
-        if timeout > 0 and time.time() - start_time >= timeout:
-            read_arduino = False
-
-    # Read the incoming message
-    if read_arduino:
-        return _read_message(board)
-
-    else:
-        return None
-
-# ------------------------
-# Get the volume to inject
-def getVolume(in_volume, unit, syringe_area, microsteps=16):
-
-    # Split the unit
-    volume, _ = unit.split('/')
-
-    # Convert the volume into steps
-    out_volume = _unit_to_steps(in_volume, volume, syringe_area, microsteps=microsteps)
-
-    return out_volume
-
-# ---------------------------
-# Get the value for the speed
-
-##-\-\-\-\-\-\-\
-## INITIALISATION
-##-/-/-/-/-/-/-/
-
-# Get the list of ports
-ports = serial.tools.list_ports.comports()
-
-# Make the list
-all_ports = []
-for p in ports:
-    print(p.device)
-
-def turn_pump_on(volume):
-    volume_value = volume # in uL that is the total volume
-    volume_value_forPump = getVolume(volume_value, 'µL/min', 100 * math.pi)
-    sendToArduino("<RUN," + '1' + "," + str(volume_value_forPump) + ">")
-    return None
 
 
-def set_init_speed(init_speed):
-    speed_value_forPump = getSpeed(init_speed, 'µL/min', 100 * math.pi)
-    sendToArduino("<SPEED," + '1' + "," + str(init_speed) + ">")
-    return None
 
 def pid_implement(exp_val,pid_itr,pid_para,volume,init_speed):
     global time_per_point,pid_sum_err, pid_now_err, flowm
@@ -141,62 +75,6 @@ def pid_implement(exp_val,pid_itr,pid_para,volume,init_speed):
 
 def collect_data_point2_excel(kp,ki,kd,pid_itr,exp_val,init_speed):
     global connection,flowm,pump_axis,pump_unit,syringe_area
-    pump_axis = '1'  # Use string, not integer
-    pump_unit = 'µL/min'
-    syringe_area = 100 * math.pi  # in mm2  syringe(r)^2*pi
-    pid_para = [kp, ki, kd]
-    # pid execution times in loop
-    volume = -300000  # total volume
-    speed_value = init_speed  # init speed
-
-    modes = ['full', 'same', 'valid']
-    # Start the connection
-    connection = serial.Serial()
-
-    connection.port = 'COM5'  # Set port
-    connection.baudrate = 9600  # Set baudrate
-
-    connection.parity = serial.PARITY_NONE  # Enable parity checking
-    connection.stopbits = serial.STOPBITS_ONE  # Number of stop bits
-    connection.bytesize = serial.EIGHTBITS  # Number of databits
-
-    connection.timeout = 1  # Set a timeout value
-    connection.xonxoff = 0  # Disable software control
-    connection.rtscts = 0
-
-    connection.open()
-
-    readFromArduino(connection)
-
-    time.sleep(1)
-
-    # Get the ID
-    #print('Getting pump ID')
-    message = sendToArduino("<GETID,0,0.0>")
-    #print(message)
-
-    # Set the acceleration
-    #print('Set acceleration')
-    acceleration_value = 1000000  # in uL/min2
-    acceleration_value_forPump = getAcceleration(acceleration_value, pump_unit, syringe_area)
-    sendToArduino("<ACCEL," + pump_axis + "," + str(acceleration_value_forPump) + ">")
-    #print(str(acceleration_value_forPump))
-    # Set the speed
-    #print('Set speed')
-    # in uL/min <--the speed unit in ul/min  u want
-    speed_value_forPump = getSpeed(speed_value, pump_unit, syringe_area)
-    sendToArduino("<SPEED," + pump_axis + "," + str(speed_value_forPump) + ">")
-    #print(str(speed_value_forPump))
-    ## ================
-    ## TO THE FLOWMETER
-
-    # Open the connection
-
-    flowm = connect_flowmeter('COM6')
-
-    # Start the flowmeter
-    init_flowmeter(flowm, 'SF06')
-
     ##-\-\-\-\
     ## RUNNING
     ##-/-/-/-/
